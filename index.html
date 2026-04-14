@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Service Ticket Management</title>
+  <meta
+    name="description"
+    content="A complete service ticket and issue management workspace for tracking service requests, repairs, billing, comments, and time logs."
+  >
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="backdrop"></div>
+  <div class="app-shell">
+    <header class="hero panel">
+      <div class="hero-copy">
+        <p class="eyebrow">Service Ticket / Issue Management</p>
+        <h1>Service Desk Control Center</h1>
+        <p class="lead">
+          Manage service requests, device repairs, task assignments, time logs,
+          billing, and collection tracking from one working dashboard.
+        </p>
+      </div>
+      <div class="hero-actions">
+        <button id="new-ticket-btn" class="button button-primary" type="button">New Ticket</button>
+        <button id="load-sample-btn" class="button button-secondary" type="button">Load Sample</button>
+        <button id="export-btn" class="button button-secondary" type="button">Export JSON</button>
+        <button id="import-btn" class="button button-secondary" type="button">Import JSON</button>
+        <input id="import-file" type="file" accept=".json,application/json" hidden>
+      </div>
+    </header>
+
+    <section class="stats-grid" aria-label="Dashboard statistics">
+      <article class="stat-card panel">
+        <p class="stat-label">Total Tickets</p>
+        <strong id="stat-total" class="stat-value">0</strong>
+        <span class="stat-footnote">All recorded service cases</span>
+      </article>
+      <article class="stat-card panel">
+        <p class="stat-label">Open Tickets</p>
+        <strong id="stat-open" class="stat-value">0</strong>
+        <span class="stat-footnote">Anything not completed yet</span>
+      </article>
+      <article class="stat-card panel">
+        <p class="stat-label">Overdue</p>
+        <strong id="stat-overdue" class="stat-value">0</strong>
+        <span class="stat-footnote">Past due date and still active</span>
+      </article>
+      <article class="stat-card panel">
+        <p class="stat-label">Urgent Cases</p>
+        <strong id="stat-urgent" class="stat-value">0</strong>
+        <span class="stat-footnote">Tickets marked urgent</span>
+      </article>
+      <article class="stat-card panel">
+        <p class="stat-label">Tracked Time</p>
+        <strong id="stat-time" class="stat-value">0m</strong>
+        <span class="stat-footnote">Time saved across all work sessions</span>
+      </article>
+    </section>
+
+    <div class="layout-grid">
+      <aside class="panel sidebar" aria-label="Ticket list and filters">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Ticket Queue</p>
+            <h2>Search and Filter</h2>
+          </div>
+          <span id="ticket-count-label" class="muted-pill">0 visible</span>
+        </div>
+
+        <div class="filters-grid">
+          <label class="field">
+            <span>Search</span>
+            <input
+              id="search-input"
+              type="search"
+              placeholder="Search ticket, customer, phone, device"
+            >
+          </label>
+          <label class="field">
+            <span>Status</span>
+            <select id="status-filter"></select>
+          </label>
+          <label class="field">
+            <span>Priority</span>
+            <select id="priority-filter"></select>
+          </label>
+          <label class="field">
+            <span>Assignee</span>
+            <select id="assignee-filter"></select>
+          </label>
+          <label class="field">
+            <span>Branch</span>
+            <select id="branch-filter"></select>
+          </label>
+        </div>
+
+        <div id="ticket-list" class="ticket-list" role="list"></div>
+      </aside>
+
+      <main class="workspace">
+        <section class="panel">
+          <div class="section-head">
+            <div>
+              <p id="editor-mode" class="section-kicker">New Ticket</p>
+              <h2 id="editor-title">Create a Service Ticket</h2>
+              <p id="editor-subtitle" class="section-subtitle">
+                Capture customer details, assign the case, and track the full service life cycle.
+              </p>
+            </div>
+            <div class="toolbar">
+              <button id="duplicate-ticket-btn" class="button button-secondary" type="button">Duplicate</button>
+              <button id="delete-ticket-btn" class="button button-danger" type="button">Delete</button>
+            </div>
+          </div>
+
+          <div class="ticket-meta-strip">
+            <div class="meta-card">
+              <span class="meta-label">Ticket Number</span>
+              <strong id="ticket-number-readout">Will be generated on save</strong>
+            </div>
+            <div class="meta-card">
+              <span class="meta-label">Last Updated</span>
+              <strong id="ticket-updated-readout">Not saved yet</strong>
+            </div>
+            <div class="meta-card">
+              <span class="meta-label">Balance</span>
+              <strong id="balance-readout">Rs. 0.00</strong>
+            </div>
+          </div>
+
+          <form id="ticket-form" novalidate>
+            <div class="form-section">
+              <div class="form-section-head">
+                <h3>Customer Details</h3>
+                <p>Use the mobile number to connect current work with previous service history.</p>
+              </div>
+              <div class="form-grid two-up">
+                <label class="field">
+                  <span>Customer Mobile Number</span>
+                  <input id="customer-mobile" type="tel" placeholder="9876543210" required>
+                </label>
+                <label class="field">
+                  <span>Customer Name</span>
+                  <input id="customer-name" type="text" placeholder="Customer full name" required>
+                </label>
+              </div>
+              <div id="service-history" class="history-panel"></div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-head">
+                <h3>Device and Task</h3>
+                <p>Capture what needs to be repaired or delivered and how the service is being handled.</p>
+              </div>
+              <div class="form-grid three-up">
+                <label class="field">
+                  <span>Device Name</span>
+                  <input id="device-name" type="text" placeholder="Laptop, printer, CCTV recorder" required>
+                </label>
+                <label class="field">
+                  <span>Category</span>
+                  <select id="category" required></select>
+                </label>
+                <label class="field">
+                  <span>Service Type</span>
+                  <select id="service-type">
+                    <option value="Office">Office</option>
+                    <option value="Onsite">Onsite</option>
+                  </select>
+                </label>
+              </div>
+              <label class="field">
+                <span>Task Description</span>
+                <input id="task-description" type="text" placeholder="Short summary of the service request" required>
+              </label>
+              <label class="field">
+                <span>Problem Description</span>
+                <textarea id="problem-description" rows="4" placeholder="Detailed issue notes"></textarea>
+              </label>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-head">
+                <h3>Assignment and Workflow</h3>
+                <p>Route each ticket to the right employee, department, and branch while keeping priority clear.</p>
+              </div>
+              <div class="form-grid four-up">
+                <label class="field">
+                  <span>Case Logged By</span>
+                  <select id="case-logged-by" required></select>
+                </label>
+                <label class="field">
+                  <span>Department</span>
+                  <select id="department" required></select>
+                </label>
+                <label class="field">
+                  <span>Branch</span>
+                  <select id="branch" required></select>
+                </label>
+                <label class="field">
+                  <span>Priority</span>
+                  <select id="priority">
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                </label>
+              </div>
+              <div class="form-grid three-up">
+                <label class="field">
+                  <span>Status</span>
+                  <select id="status">
+                    <option value="Not Started">Not Started</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Paused">Paused</option>
+                    <option value="Waiting on Someone Else">Waiting on Someone Else</option>
+                    <option value="Deferred">Deferred</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Start Date</span>
+                  <input id="start-date" type="date">
+                </label>
+                <label class="field">
+                  <span>Due Date</span>
+                  <input id="due-date" type="date">
+                </label>
+              </div>
+              <label class="field">
+                <span>Assigned To</span>
+                <div id="assigned-to-group" class="check-grid"></div>
+              </label>
+              <label class="field">
+                <span>Completed Date</span>
+                <input id="completed-date" type="date">
+              </label>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-head">
+                <h3>Estimate and Spare Parts</h3>
+                <p>Track estimate approval, spare requirements, and ordering status inside the same case file.</p>
+              </div>
+              <div class="toggle-row">
+                <label class="toggle-card">
+                  <input id="estimate-given" type="checkbox">
+                  <span>Estimate Given</span>
+                </label>
+                <label class="toggle-card">
+                  <input id="spares-required" type="checkbox">
+                  <span>Spares Required</span>
+                </label>
+                <label class="toggle-card">
+                  <input id="spares-ordered" type="checkbox">
+                  <span>Spares Ordered</span>
+                </label>
+              </div>
+              <div class="form-grid two-up">
+                <label class="field">
+                  <span>Estimate For Customer</span>
+                  <textarea id="estimate-for-customer" rows="4" placeholder="Estimated Rs. 3200 for screen replacement"></textarea>
+                </label>
+                <label class="field">
+                  <span>Spares List</span>
+                  <textarea id="spares-list" rows="4" placeholder="LCD panel, keyboard, SSD, power adapter"></textarea>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-head">
+                <h3>Billing and Collection</h3>
+                <p>Balance is calculated automatically from the total bill, advance, discount, and final payment.</p>
+              </div>
+              <div class="form-grid five-up">
+                <label class="field">
+                  <span>Total Bill Amount</span>
+                  <input id="total-bill-amount" type="number" min="0" step="0.01" placeholder="0.00">
+                </label>
+                <label class="field">
+                  <span>Advance Taken</span>
+                  <input id="advance-taken" type="number" min="0" step="0.01" placeholder="0.00">
+                </label>
+                <label class="field">
+                  <span>Discount Given</span>
+                  <input id="discount-given" type="number" min="0" step="0.01" placeholder="0.00">
+                </label>
+                <label class="field">
+                  <span>Final Payment</span>
+                  <input id="final-payment" type="number" min="0" step="0.01" placeholder="0.00">
+                </label>
+                <label class="field">
+                  <span>Balance Amount</span>
+                  <input id="balance-amount" type="text" readonly>
+                </label>
+              </div>
+              <div class="toggle-row">
+                <label class="toggle-card">
+                  <input id="collected" type="checkbox">
+                  <span>Device Collected</span>
+                </label>
+              </div>
+              <div class="form-grid two-up">
+                <label class="field">
+                  <span>Collected By</span>
+                  <select id="collected-by">
+                    <option value="">Select collection source</option>
+                    <option value="Customer">Customer</option>
+                    <option value="Relative">Relative</option>
+                    <option value="Staff">Staff</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Collected At</span>
+                  <input id="collected-at" type="text" readonly>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-head">
+                <h3>Solution Tracking</h3>
+                <p>Record both the action taken and the solution offered to the customer.</p>
+              </div>
+              <div class="form-grid two-up">
+                <label class="field">
+                  <span>Solution Given</span>
+                  <textarea id="solution-given" rows="4" placeholder="What was fixed or completed"></textarea>
+                </label>
+                <label class="field">
+                  <span>Solution Offered</span>
+                  <textarea id="solution-offered" rows="4" placeholder="Alternative or proposed solution"></textarea>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button id="save-ticket-btn" class="button button-primary" type="submit">Save Ticket</button>
+              <button id="clear-form-btn" class="button button-secondary" type="button">Clear Form</button>
+            </div>
+          </form>
+        </section>
+
+        <div class="detail-grid">
+          <section class="panel">
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">Time Tracking</p>
+                <h3>Work Sessions</h3>
+              </div>
+              <span id="timer-warning" class="muted-pill">Save a ticket to start timing</span>
+            </div>
+            <div class="timer-strip">
+              <div>
+                <p class="timer-label">Current Session</p>
+                <strong id="live-timer">00:00:00</strong>
+              </div>
+              <div>
+                <p class="timer-label">Logged Time</p>
+                <strong id="total-tracked-time">0m</strong>
+              </div>
+            </div>
+            <div class="toolbar">
+              <button id="start-timer-btn" class="button button-primary" type="button">Start</button>
+              <button id="pause-timer-btn" class="button button-secondary" type="button">Pause</button>
+              <button id="stop-timer-btn" class="button button-secondary" type="button">Stop</button>
+            </div>
+            <div id="time-log-list" class="timeline-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">Internal Comments</p>
+                <h3>Team Notes</h3>
+              </div>
+            </div>
+            <div class="comment-form">
+              <label class="field">
+                <span>Comment Author</span>
+                <input id="comment-author" type="text" placeholder="Technician or manager name">
+              </label>
+              <label class="field">
+                <span>Internal Comment</span>
+                <textarea id="comment-text" rows="4" placeholder="Waiting for spare part, customer informed, supplier quote received"></textarea>
+              </label>
+              <button id="add-comment-btn" class="button button-primary" type="button">Add Comment</button>
+            </div>
+            <div id="comment-list" class="timeline-list"></div>
+          </section>
+        </div>
+
+        <div class="detail-grid">
+          <section class="panel">
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">Activity Log</p>
+                <h3>Ticket Events</h3>
+              </div>
+            </div>
+            <div id="activity-log" class="timeline-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">Reference Data</p>
+                <h3>Category Management and Routing Lists</h3>
+              </div>
+            </div>
+            <div id="reference-grid" class="reference-grid">
+              <section class="reference-card">
+                <h4>Categories</h4>
+                <div id="categories-list" class="pill-list"></div>
+                <div class="inline-form">
+                  <input id="categories-input" type="text" placeholder="Add category">
+                  <button class="button button-secondary" type="button" data-add-reference="categories">Add</button>
+                </div>
+              </section>
+              <section class="reference-card">
+                <h4>Employees</h4>
+                <div id="employees-list" class="pill-list"></div>
+                <div class="inline-form">
+                  <input id="employees-input" type="text" placeholder="Add employee">
+                  <button class="button button-secondary" type="button" data-add-reference="employees">Add</button>
+                </div>
+              </section>
+              <section class="reference-card">
+                <h4>Departments</h4>
+                <div id="departments-list" class="pill-list"></div>
+                <div class="inline-form">
+                  <input id="departments-input" type="text" placeholder="Add department">
+                  <button class="button button-secondary" type="button" data-add-reference="departments">Add</button>
+                </div>
+              </section>
+              <section class="reference-card">
+                <h4>Branches</h4>
+                <div id="branches-list" class="pill-list"></div>
+                <div class="inline-form">
+                  <input id="branches-input" type="text" placeholder="Add branch">
+                  <button class="button button-secondary" type="button" data-add-reference="branches">Add</button>
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
